@@ -128,6 +128,7 @@ def CalcQuasiCrystalAnimate(width,height,scale_array,waves_array,freq_array,offs
 		ani.save(path,writer='pillow')
 	return ani
 
+#管理參數的類別。如果要取得的參數沒有設定，根據不同的取得成員函式產生亂數給呼叫者。
 class ParamSaver:
 	def __init__(self):
 		self.params={}
