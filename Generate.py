@@ -9,12 +9,14 @@ import matplotlib.animation as animation
 import argparse
 
 
+# 基礎隨機布林函數
 def RandBool():
 	if random.randint(0,1) == 0:
 		return True
 	else:
 		return False
 
+# 所有可用的 Matplotlib Colormaps (色表)
 AllCmp = ['Accent', 'Blues', 'BrBG', 'BuGn',  'BuPu',  'CMRmap', 'Dark2', 'GnBu', 'Greens', 'Greys', 'OrRd', 'Oranges', 'PRGn', 'Paired',
 		  'Pastel1', 'Pastel2', 'PiYG', 'PuBu', 'PuBuGn', 'PuOr', 'PuRd', 'Purples', 'RdBu', 'RdGy', 'RdPu', 'RdYlBu', 'RdYlGn', 'Reds',
 		  'Set1', 'Set2', 'Set3', 'Spectral', 'Wistia', 'YlGn', 'YlGnBu', 'YlOrBr', 'YlOrRd', 'afmhot', 'autumn', 'binary', 'bone', 'brg',
@@ -25,16 +27,19 @@ AllCmp = ['Accent', 'Blues', 'BrBG', 'BuGn',  'BuPu',  'CMRmap', 'Dark2', 'GnBu'
 
 
 def main(input,args):
+    # 如果輸出的資料夾不存在則建立
 	if not os.path.isdir(args.folder):
 		os.mkdir(args.folder)
 
 	num=1 if args.num is None else args.num
 
+    # 開始批次產生圖案
 	for k in range(num):
-		output=ParamSaver()
-		name = '{0:05}'.format(k+1)
+		output=ParamSaver()         # 建立一個新的參數紀錄器，準備儲存這一次生成的設定
+		name = '{0:05}'.format(k+1) # 檔案編號 (例如 00001)
 		print('start:'+name)
 
+        # 從 input (可能是外部讀入或隨機) 取得各項幾何參數
 		width = input.getInt("width",512)
 		height = input.getInt("height",512)
 		scale=input.getInt("scale",1,input.getInt("maxScale",10))
@@ -42,6 +47,7 @@ def main(input,args):
 		freq = input.getInt("freq",2,input.getInt("maxFreq",64))
 		offset = input.getFloat("offset",0,pi if RandBool() else None)
 		jump_zero = input.getBool("jump_zero")
+        # 選擇座標轉換模式
 		AllFunc=['default','polar','sqrtpolar','logpolar','sqrtlogpolar']
 		calcFuncName=input.getChoice("calcFunc",AllFunc)
 		if calcFuncName=='polar':
@@ -55,6 +61,7 @@ def main(input,args):
 		else:
 			func = GetStdLineArray
 
+        # 將選定的幾何參數存入 output 字典中
 		output.set("width",width)
 		output.set("height",height)
 		output.set("scale",scale)
@@ -64,6 +71,7 @@ def main(input,args):
 		output.set("jump_zero",jump_zero)
 		output.set("calcFunc",calcFuncName)
 
+        # 設定視覺與光照效果
 		cmap = input.getChoice("colormap",plt.colormaps())
 		AllBlendModes = ['hsv','overlay','soft']
 		blend_mode=input.getChoice("blend_mode",AllBlendModes,RandBool())
@@ -89,6 +97,7 @@ def main(input,args):
 		else:
 			output.set("blend_mode","None")
 
+        # 1. 產生並儲存靜態圖片
 		data = GenerateQuasiCrystalPhase(waves,freq,width,height,scale,offset,jump_zero,func=func)
 		image = np.empty((height, width))
 		fig = plt.figure(figsize=(width/100, height/100))
@@ -100,6 +109,7 @@ def main(input,args):
 		#mpimg.imsave(fname+'.png',image,cmap=cmap)
 		im.write_png(fname+'.png')
 
+        # 2. 產生並儲存基礎動畫 (僅相位改變)
 		frames=input.getInt("frames",30)
 		delay=input.getInt("delay",8)
 
@@ -109,6 +119,7 @@ def main(input,args):
 		ax.axis('off')
 		ShowQuasiCrystalAnimate(data,image,fig,frames,delay,cmap,blend_mode,azdeg,altdeg,vexag,path=fname+'.gif')
 
+        # 3. 產生進階動畫 (波數、頻率、縮放隨時間變動)
 		frames=input.getInt("frames",16,input.getInt("max_frames",32))
 		offset_array=input.getNumericArray("offset_array",offset,offset,frames,RandBool())
 		phase_array=input.getNumericArray("phase_array",0,2*pi/frames,frames)
@@ -116,6 +127,7 @@ def main(input,args):
 		freq_array=input.getNumericArray("freq_array",freq,input.getInt("max_freq_step",6),frames,RandBool())
 		scale_array=input.getNumericArray("scale_array",scale,input.getInt("max_scale_step",ceil(scale*0.1)),frames,RandBool())
 
+        # 確保進階動畫中至少有一個參數是會變動的，否則重新生成陣列
 		testTrival=not(input.hasNumericArray("waves_array") and input.hasNumericArray("freq_array") and input.hasNumericArray("scale_array"))
 		while testTrival:
 			if len(waves_array)>1 or len(freq_array)>1 or len(scale_array)>1:
@@ -124,7 +136,7 @@ def main(input,args):
 			freq_array=input.getNumericArray("freq_array",freq,input.getInt("max_freq_step",6),frames,RandBool())
 			scale_array=input.getNumericArray("scale_array",scale,input.getInt("max_scale_step",ceil(scale*0.1)),frames,RandBool())
 
-
+        # 儲存完整的動畫參數至 JSON
 		output.set("frames",frames)
 		output.set("delay",delay)
 		output.set("waves_array",waves_array)
@@ -134,6 +146,7 @@ def main(input,args):
 		output.set("scale_array",scale_array)
 		output.save(fname+'.json')
 
+        # 4. 計算並儲存進階動畫影片 (_v.gif)
 		image = np.empty((height, width))
 		fig = plt.figure(figsize=(width/100, height/100))
 		ax = fig.add_axes([0, 0, 1, 1])
@@ -141,12 +154,10 @@ def main(input,args):
 		ani=CalcQuasiCrystalAnimate(width,height,scale_array,waves_array,freq_array,offset_array,phase_array,image,fig,frames,100,cmap,func,jump_zero,blend_mode,azdeg,altdeg,vexag,path=fname+'_v.gif')
 
 
-
+# 命令列參數解析與環境設定
 if __name__ == '__main__':
 	def float_range(min_value, max_value):
-		"""
-		Returns a function that checks if a float value is within a given range.
-		"""
+		# 輔助：檢查浮點數範圍
 		def range_checker(value):
 			fvalue = float(value)
 			if fvalue < min_value or fvalue > max_value:
@@ -157,13 +168,15 @@ if __name__ == '__main__':
 		return range_checker
 
 	parser = argparse.ArgumentParser(
-			description="Generate animated gifs of quasicrystals using sum of plane waves https://github.com/makeyourownmaker/QuasicrystalGifs")
+			description="Generate animated gifs of quasicrystals using sum of plane waves. Copy and modified from\n https://github.com/makeyourownmaker/QuasicrystalGifs")
 
+    # 設定必填參數
 	required = parser.add_argument_group('required arguments')
 	required.add_argument('-fd', '--folder', help='Foder for files for animation', type=str, required=True)
 
+    # 設定選填參數 (包含各種隨機化與範圍限制)
 	optional = parser._action_groups.pop()
-	optional.add_argument('-n', '--num', help='Number of plane waves - default=%(default)s', default=1, type=int)
+	optional.add_argument('-n', '--num', help='Number of images - default=%(default)s', default=1, type=int)
 	optional.add_argument('-rs', '--resolution', help='Image size in pixels', type=int, metavar="[64, 4096]", choices=range(64, 4096))
 	optional.add_argument('-sl', '--scale', help='Scale for image range', type=int, choices=range(1,10000))
 	optional.add_argument('-msl', '--max_scale', help='Max scale for image range', type=int, choices=range(1,10000))
@@ -194,12 +207,14 @@ if __name__ == '__main__':
 	parser._action_groups.append(optional)
 	args = parser.parse_args()
 
+    # 初始化 ParamSaver 並嘗試讀取外部設定檔
 	input=ParamSaver()
 	try:
 		input.loadFile(args.input)
 	except:
-		input=ParamSaver()
+		input=ParamSaver()      # 讀取失敗則使用全空白設定(全亂數)
 
+    # 將命令行輸入的參數強制覆蓋進 input_saver
 	input.set("width",args.resolution)
 	input.set("height",args.resolution)
 	input.set("scale",args.scale)
